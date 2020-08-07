@@ -8,7 +8,6 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from logging import getLogger, FileHandler, Formatter, DEBUG
 from os import getenv, path, makedirs, remove
-from pyunpack import Archive
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen, urlretrieve
 
@@ -60,22 +59,11 @@ async def search(ctx, search_string: str, query_type: str = None):
     global apiUrl
 
     # Prevent calling before an api is added
-    if not apiUrl:
-        return await ctx.send('```Firstly add an api url with: $api <url>```')
+    if not apiUrl: return await ctx.send('```Firstly add an api url with: $api <url>```')
 
     # Search request
-    apiRequest = Request(
-        url='{0}search?query={1}%3D{2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string),
-        headers=REQUEST_HEADER
-    )
-
-    with urlopen(apiRequest) as response:
-        apiData = json.loads(response.read())
-
-    apiResultChoice = [
-        '`{0}` {1} - {2}'.format(i, song['name'], song['artist']) + (' | '+'⭐'*int(song['tier_guitar']) if song['tier_guitar'] else '')
-        for i, song in enumerate(apiData['songs'], start=1)
-    ]
+    apiData = getApiData(apiUrl, search_string, query_type)
+    apiResultChoice = generateResultChoices(apiData)
     apiResponse = discord.Embed(
         title=ctx.message.author.name,
         colour=EMBED_COLOUR,
@@ -85,11 +73,7 @@ async def search(ctx, search_string: str, query_type: str = None):
     await ctx.send(embed=apiResponse, delete_after=DEFAULT_TIMEOUT)
 
     # Handle response
-    def check(m):
-        try:
-            return 0 < int(m.content) <= len(apiData['songs']) and ctx.message.author.name == m.author.name
-        except Exception:
-            return False
+    check = lambda message: message.content.isdigit() and 0 < int(message.content) <= len(apiData['songs']) and ctx.message.author.name == message.author.name
 
     try:
         msg = await bot.wait_for('message', check=check, timeout=DEFAULT_TIMEOUT)
@@ -102,8 +86,22 @@ async def search(ctx, search_string: str, query_type: str = None):
 
 @bot.event
 async def on_command_error(ctx, error):
-    print(error)
-    await ctx.send_help(ctx.command)
+    await ctx.send(error)
+
+def getApiData(apiUrl: str, search_string: str, query_type: str = None):
+    apiRequest = Request(
+        url='{0}search?query={1}%3D{2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string),
+        headers=REQUEST_HEADER
+    )
+    with urlopen(apiRequest) as response:
+        return json.loads(response.read())
+
+def generateResultChoices(apiData):
+    tierGuitar = lambda song : ' | '+'⭐'*int(song['tier_guitar']) if song['tier_guitar'] else ''
+    return [
+        '`{0}` {1} - {2}{3}'.format(i, song['name'], song['artist'], tierGuitar(song))
+        for i, song in enumerate(apiData['songs'], start=1)
+    ]
 
 def downloadSong(songToDownload: dict):
     if songToDownload['directLinks'] and songToDownload['directLinks']['archive']:
@@ -114,15 +112,16 @@ def downloadSong(songToDownload: dict):
 
         with urlopen(request) as file:
             contentDisposition = file.info()['Content-Disposition']
-            t, p = parse_header(contentDisposition)
-            with open(DOWNLOAD_PATH_TEMP + '/' + p['filename'], 'wb') as filehandle:
-                filehandle.write(file.read());
-                songArchive = p['filename']
+            type, data = parse_header(contentDisposition)
+            with open(DOWNLOAD_PATH_TEMP + '/' + data['filename'], 'wb') as filehandle:
+                if filehandle.write(file.read()): extractArchive(data['filename'])
+    else:
+        pass
 
-        if songArchive:
-            songDirectory, fileExtension = path.splitext(songArchive)
-            if not path.exists(DOWNLOAD_PATH + '/' + songDirectory): makedirs(DOWNLOAD_PATH + '/' + songDirectory)
-            Archive(DOWNLOAD_PATH_TEMP + '/' + songArchive).extractall(DOWNLOAD_PATH + '/' + songDirectory)
-            remove(DOWNLOAD_PATH_TEMP + '/' + songArchive)
+def extractArchive(file: str):
+    # songDirectory, fileExtension = path.splitext(file)
+    # if not path.exists(DOWNLOAD_PATH + '/' + songDirectory): makedirs(DOWNLOAD_PATH + '/' + songDirectory)
+    patoolib.extract_archive(DOWNLOAD_PATH_TEMP + '/' + file, verbosity=-1, outdir=DOWNLOAD_PATH + '/', interactive=False)
+    remove(DOWNLOAD_PATH_TEMP + '/' + file)
 
 bot.run(TOKEN)
