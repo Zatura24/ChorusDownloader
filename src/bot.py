@@ -25,6 +25,7 @@ bot = commands.Bot(command_prefix='$')
 
 # Globals
 DEFAULT_TIMEOUT = 15.0
+EMBED_COLOUR = discord.Colour.blue()
 apiUrl: str = None
 
 @bot.command(name='ping')
@@ -45,7 +46,7 @@ async def api(ctx, api_url: str=None):
     else:
         await ctx.send_help('api')
 
-@bot.command(name='search', help='Make a search using a string with an optional type')
+@bot.command(name='search', help='Make a search using a string with an optional type. After that select a song by typing it\'s numerical value')
 async def search(ctx, search_string: str, query_type: str = None):
     global apiUrl
 
@@ -55,35 +56,46 @@ async def search(ctx, search_string: str, query_type: str = None):
 
     # Search request
     apiRequest = Request(
-        url='{0}search?query={1}={2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string),
+        url='{0}search?query={1}%3D{2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string),
         headers={'User-Agent': 'Mozilla/5.0'}
     )
-    apiData = {}
+
     with urlopen(apiRequest) as response:
         apiData = json.loads(response.read())
 
-    apiResultChoice = ['`{0}` {1} - {2}'.format(i, song['name'], song['artist']) for i, song in enumerate(apiData['songs'], start=1)]
+    apiResultChoice = [
+        '`{0}` {1} - {2}'.format(i, song['name'], song['artist']) + (' | '+'⭐'*int(song['tier_guitar']) if song['tier_guitar'] else '')
+        for i, song in enumerate(apiData['songs'], start=1)
+    ]
     apiResponse = discord.Embed(
         title=ctx.message.author.name,
-        colour=discord.Colour.blue(),
-        description='\n'.join(apiResultChoice),
+        colour=EMBED_COLOUR,
+        description='\n'.join(apiResultChoice)
     )
     apiResponse.set_footer(text='Type a number to download it')
     await ctx.send(embed=apiResponse, delete_after=DEFAULT_TIMEOUT)
 
     # Handle response
     def check(m):
-        return 0 < int(m.content) <= len(apiData['songs'])
+        try:
+            return 0 < int(m.content) <= len(apiData['songs']) and ctx.message.author.name == m.author.name
+        except Exception:
+            return False
 
     try:
         msg = await bot.wait_for('message', check=check, timeout=DEFAULT_TIMEOUT)
-        await ctx.send('Downloading: {0}'.format(apiData['songs'][int(msg.content) - 1]['name']))
+        songToDownload = apiData['songs'][int(msg.content) - 1]
+        await ctx.send('Downloading: {0}'.format(songToDownload['name']))
+        downloadSong(songToDownload)
     except TimeoutError:
         pass
 
 @bot.event
 async def on_command_error(ctx, error):
+    print(error)
     await ctx.send_help(ctx.command)
 
+def downloadSong(songToDownload: dict):
+    pass
 
 bot.run(TOKEN)
