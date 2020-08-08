@@ -21,15 +21,15 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # Creating bot
-bot = commands.Bot(command_prefix='$')
+bot = commands.Bot(command_prefix=os.getenv('DISCORD_COMMAND_PREFIX') if os.getenv('DISCORD_COMMAND_PREFIX') else '$')
 
 # Globals
 DEFAULT_TIMEOUT = 15.0
-DOWNLOAD_PATH = './download'
+DOWNLOAD_PATH = os.getenv('DOWNLOAD_PATH') | './download'
 DOWNLOAD_PATH_TEMP = './temp'
 EMBED_COLOUR = discord.Colour.blue()
 REQUEST_HEADER = {'User-Agent': 'Mozilla/5.0'}
-apiUrl: str = None
+API_URL: str = os.getenv('CHORUS_API') | None
 
 if not os.path.exists(DOWNLOAD_PATH_TEMP): os.makedirs(DOWNLOAD_PATH_TEMP)
 if not os.path.exists(DOWNLOAD_PATH): os.makedirs(DOWNLOAD_PATH)
@@ -41,26 +41,26 @@ async def pong(ctx):
 @bot.command(name='api', help='Gets or sets the api')
 @commands.has_role('admin')
 async def api(ctx, api_url: str=None):
-    global apiUrl
+    global API_URL
 
     if api_url:
         if not api_url.endswith('/'): api_url += '/'
-        apiUrl = api_url
+        API_URL = api_url
         await ctx.send('Api url set to: %s' % api_url)
-    elif apiUrl:
-        await ctx.send('Api url is: %s' % apiUrl)
+    elif API_URL:
+        await ctx.send('Api url is: %s' % API_URL)
     else:
         await ctx.send_help('api')
 
 @bot.command(name='search', help='Make a search using a string with an optional type. After that select a song by typing it\'s numerical value')
 async def search(ctx, search_string: str, query_type: str = None):
-    global apiUrl
+    global API_URL
 
     # Prevent calling before an api is added
-    if not apiUrl: return await ctx.send('```Firstly add an api url with: $api <url>```')
+    if not API_URL: return await ctx.send('```Firstly add an api url with: $api <url>```')
 
     # Search request
-    apiData = getApiData(apiUrl, search_string, query_type)
+    apiData = getApiData(API_URL, search_string, query_type)
     apiResultChoice = generateResultChoices(apiData)
     apiResponse = discord.Embed(
         title=ctx.message.author.name,
