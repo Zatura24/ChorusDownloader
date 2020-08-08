@@ -1,15 +1,13 @@
 import discord
-import html
 import json
 import patoolib
+import requests
+import os
 from asyncio import TimeoutError
 from cgi import parse_header
 from discord.ext import commands
 from dotenv import load_dotenv
 from logging import getLogger, FileHandler, Formatter, DEBUG
-from os import getenv, path, makedirs, remove
-from urllib.parse import urlparse
-from urllib.request import Request, urlopen, urlretrieve
 
 # Setting up the logger
 logger = getLogger('discord')
@@ -20,7 +18,7 @@ logger.addHandler(handler)
 
 # loading Discord Token from environment variables
 load_dotenv()
-TOKEN = getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('DISCORD_TOKEN')
 
 # Creating bot
 bot = commands.Bot(command_prefix='$')
@@ -33,8 +31,8 @@ EMBED_COLOUR = discord.Colour.blue()
 REQUEST_HEADER = {'User-Agent': 'Mozilla/5.0'}
 apiUrl: str = None
 
-if not path.exists(DOWNLOAD_PATH_TEMP): makedirs(DOWNLOAD_PATH_TEMP)
-if not path.exists(DOWNLOAD_PATH): makedirs(DOWNLOAD_PATH)
+if not os.path.exists(DOWNLOAD_PATH_TEMP): os.makedirs(DOWNLOAD_PATH_TEMP)
+if not os.path.exists(DOWNLOAD_PATH): os.makedirs(DOWNLOAD_PATH)
 
 @bot.command(name='ping')
 async def pong(ctx):
@@ -89,12 +87,10 @@ async def on_command_error(ctx, error):
     await ctx.send(error)
 
 def getApiData(apiUrl: str, search_string: str, query_type: str = None):
-    apiRequest = Request(
-        url='{0}search?query={1}%3D{2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string),
-        headers=REQUEST_HEADER
-    )
-    with urlopen(apiRequest) as response:
-        return json.loads(response.read())
+    url='{0}search?query={1}%3D{2}'.format(apiUrl, query_type, search_string) if query_type else '{0}search?query={1}'.format(apiUrl, search_string)
+
+    with requests.get(url, headers=REQUEST_HEADER) as response:
+        return json.loads(response.content)
 
 def generateResultChoices(apiData):
     tierGuitar = lambda song : ' | '+'⭐'*int(song['tier_guitar']) if song['tier_guitar'] else ''
@@ -104,24 +100,32 @@ def generateResultChoices(apiData):
     ]
 
 def downloadSong(songToDownload: dict):
-    if songToDownload['directLinks'] and songToDownload['directLinks']['archive']:
-        request = Request(
-            url=songToDownload['directLinks']['archive'],
-            headers=REQUEST_HEADER
-        )
+    if 'directLinks' in songToDownload:
+        if 'archive' in songToDownload['directLinks']:
+            __extractArchive(__downloadSongFromArchiveOrAsSingleFiles(songToDownload, 'archive', isArchive=True))
+        else:
+            if not os.path.exists(DOWNLOAD_PATH + '/' + songToDownload['name']): os.makedirs(DOWNLOAD_PATH + '/' + songToDownload['name'])
+            for key in songToDownload['directLinks']:
+                __downloadSongFromArchiveOrAsSingleFiles(songToDownload, key, isArchive=False)
 
-        with urlopen(request) as file:
-            contentDisposition = file.info()['Content-Disposition']
-            type, data = parse_header(contentDisposition)
-            with open(DOWNLOAD_PATH_TEMP + '/' + data['filename'], 'wb') as filehandle:
-                if filehandle.write(file.read()): extractArchive(data['filename'])
-    else:
-        pass
+def __downloadSongFromArchiveOrAsSingleFiles(songToDownload: dict, key: str, isArchive: bool = False):
+    url=songToDownload['directLinks'][key]
+    with requests.get(url, headers=REQUEST_HEADER) as response:
+        filename = __getFilenameFromContentDisposition(response.headers.get('Content-Disposition'))
+        path = DOWNLOAD_PATH_TEMP + '/' + filename if isArchive else DOWNLOAD_PATH + '/' + songToDownload['name'] + '/' + filename
+        with open(path, 'wb') as filehandle:
+            if filehandle.write(response.content) > 0: return filename
 
-def extractArchive(file: str):
+
+def __getFilenameFromContentDisposition(cd):
+    if not cd: return None
+    _, data = parse_header(cd)
+    return data['filename'] if 'filename' in data else None
+
+def __extractArchive(file: str):
     # songDirectory, fileExtension = path.splitext(file)
     # if not path.exists(DOWNLOAD_PATH + '/' + songDirectory): makedirs(DOWNLOAD_PATH + '/' + songDirectory)
     patoolib.extract_archive(DOWNLOAD_PATH_TEMP + '/' + file, verbosity=-1, outdir=DOWNLOAD_PATH + '/', interactive=False)
-    remove(DOWNLOAD_PATH_TEMP + '/' + file)
+    os.remove(DOWNLOAD_PATH_TEMP + '/' + file)
 
 bot.run(TOKEN)
