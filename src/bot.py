@@ -21,15 +21,15 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
 # Creating bot
-bot = commands.Bot(command_prefix=os.getenv('DISCORD_COMMAND_PREFIX') if os.getenv('DISCORD_COMMAND_PREFIX') else '$')
+bot = commands.Bot(command_prefix=os.getenv('DISCORD_COMMAND_PREFIX') or '$')
 
 # Globals
 DEFAULT_TIMEOUT = 15.0
-DOWNLOAD_PATH = os.getenv('DOWNLOAD_PATH') | './download'
+DOWNLOAD_PATH = os.getenv('DOWNLOAD_PATH') or './download'
 DOWNLOAD_PATH_TEMP = './temp'
 EMBED_COLOUR = discord.Colour.blue()
 REQUEST_HEADER = {'User-Agent': 'Mozilla/5.0'}
-API_URL: str = os.getenv('CHORUS_API') | None
+API_URL: str = os.getenv('CHORUS_API') or None
 
 if not os.path.exists(DOWNLOAD_PATH_TEMP): os.makedirs(DOWNLOAD_PATH_TEMP)
 if not os.path.exists(DOWNLOAD_PATH): os.makedirs(DOWNLOAD_PATH)
