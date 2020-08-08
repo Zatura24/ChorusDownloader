@@ -1,8 +1,8 @@
 import discord
 import json
 import patoolib
-import requests
 import os
+import requests
 from asyncio import TimeoutError
 from cgi import parse_header
 from discord.ext import commands
@@ -24,6 +24,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 bot = commands.Bot(command_prefix=os.getenv('DISCORD_COMMAND_PREFIX') or '$')
 
 # Globals
+CHUNK_SIZE = 1024 * 8
 DEFAULT_TIMEOUT = 15.0
 DOWNLOAD_PATH = os.getenv('DOWNLOAD_PATH') or './download'
 DOWNLOAD_PATH_TEMP = './temp'
@@ -76,9 +77,9 @@ async def search(ctx, search_string: str, query_type: str = None):
     try:
         msg = await bot.wait_for('message', check=check, timeout=DEFAULT_TIMEOUT)
         songToDownload = apiData['songs'][int(msg.content) - 1]
-        await ctx.send('Downloading: {0}'.format(songToDownload['name']))
+        await ctx.send('Downloading: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
         downloadSong(songToDownload)
-        await ctx.send('Downloaded: {0}'.format(songToDownload['name']))
+        await ctx.send('Downloaded: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
     except TimeoutError:
         pass
 
@@ -110,11 +111,23 @@ def downloadSong(songToDownload: dict):
 
 def __downloadSongFromArchiveOrAsSingleFiles(songToDownload: dict, key: str, isArchive: bool = False):
     url=songToDownload['directLinks'][key]
-    with requests.get(url, headers=REQUEST_HEADER) as response:
+    with requests.get(url, headers=REQUEST_HEADER, stream=True) as response:
+        # Bypass Google drive virus scanning warning
+        downloadWarning = next((key for key in response.cookies.get_dict() if key.startswith('download_warning')), None)
+        if downloadWarning:
+            response = requests.get(url+'&confirm='+response.cookies[downloadWarning], headers=REQUEST_HEADER, cookies=response.cookies, stream=True)
+
+        # Save response to file
         filename = __getFilenameFromContentDisposition(response.headers.get('Content-Disposition'))
         path = DOWNLOAD_PATH_TEMP + '/' + filename if isArchive else DOWNLOAD_PATH + '/' + songToDownload['name'] + '/' + filename
+
+        response.raise_for_status()
         with open(path, 'wb') as filehandle:
-            if filehandle.write(response.content) > 0: return filename
+            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                filehandle.write(chunk)
+               
+        del response
+        return filename
 
 
 def __getFilenameFromContentDisposition(cd):
