@@ -1,6 +1,22 @@
 # 🎶 Chorus Downloader 🎶
 Chorus Downloader is a discord bot for downloading songs of Chorus like repositories.
 
+This bot is based on the API created by Paturages: [Chorus](https://github.com/Paturages/chorus)
+
+
+# Avaiable commands
+Following is a list of available commands.
+
+`$ping`
+pong
+
+`$api [url]`
+Gets or Sets the api url. __Note__: requires 'admin' role
+
+`$search <search_string> [query_type]`
+Searches the api for a given 'search_string'. Optionaly a query_type can be supplied. These are currently the same as documented in Paturages API.  
+__Note__: If more than one word is needed for the search, the search_string needs to be encapsulated in quotes
+
 # Install
 First create a docker image:
 ```bash
