@@ -1,5 +1,4 @@
 import discord
-import json
 import patoolib
 import os
 import requests
@@ -82,16 +81,19 @@ async def search(ctx, search_string: str, query_type: str = None):
         msg = await bot.wait_for('message', check=check, timeout=DEFAULT_TIMEOUT)
         songToDownload = apiData['songs'][int(msg.content) - 1]
 
+        async def sendDownloadMessage(message: str):
+            return await ctx.send(message + '{0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
+
         if songToDownload['id'] in DOWNLOADED_SONGS_LIST:
-            await ctx.send('Already downloaded: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
+            await sendDownloadMessage('✅ Already downloaded: ')
         else:
-            downloadingMsg = await ctx.send('Downloading: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
+            downloadingMsg = await sendDownloadMessage('⌛ Downloading: ')
             if downloadSong(songToDownload):
-                __addDownloadedSongToList(songToDownload['id'])
-                await ctx.send('Downloaded: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
-                await downloadingMsg.delete()
+                __addDownloadedSongToList(songToDownload['id'], DOWNLOADED_SONGS_LIST, DOWNLOADED_SONGS_FILE)
+                await sendDownloadMessage('✅ Downloaded: ')
             else:
-                await ctx.send('Error downloading: {0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
+                await sendDownloadMessage('❌ Error downloading: ')
+            await downloadingMsg.delete()
     except TimeoutError:
         pass
 
@@ -114,48 +116,49 @@ def generateResultChoices(apiData: dict):
 def downloadSong(songToDownload: dict):
     if 'directLinks' in songToDownload:
         if 'archive' in songToDownload['directLinks']:
-            __extractArchive(__downloadSongFromArchiveOrAsSingleFiles(songToDownload, 'archive', isArchive=True))
-            return True
+            __extractArchive(
+                __downloadSongToPath(songToDownload['directLinks']['archive'], DOWNLOAD_PATH_TEMP, CHUNK_SIZE), 
+                DOWNLOAD_PATH_TEMP, 
+                DOWNLOAD_PATH
+            )
         else:
-            os.makedirs(DOWNLOAD_PATH + '/' + songToDownload['name'])
+            os.makedirs(os.path.join(DOWNLOAD_PATH, songToDownload['name']))
             for key in songToDownload['directLinks']:
-                __downloadSongFromArchiveOrAsSingleFiles(songToDownload, key, isArchive=False)
-            return True
+                __downloadSongToPath(songToDownload['directLinks'][key], os.path.join(DOWNLOAD_PATH, songToDownload['name']), CHUNK_SIZE)
+        return True
     return False
 
-def __downloadSongFromArchiveOrAsSingleFiles(songToDownload: dict, key: str, isArchive: bool = False):
-    url=songToDownload['directLinks'][key]
-    with requests.get(url, headers=REQUEST_HEADER, stream=True) as response:
+def __downloadSongToPath(downloadLink: str, downloadPath: str, chunkSize: int):
+    with requests.get(downloadLink, headers=REQUEST_HEADER, stream=True) as response:
         # Bypass Google drive virus scanning warning
         downloadWarning = next((key for key in response.cookies.get_dict() if key.startswith('download_warning')), None)
         if downloadWarning:
-            response = requests.get(url+'&confirm='+response.cookies[downloadWarning], headers=REQUEST_HEADER, cookies=response.cookies, stream=True)
+            response = requests.get(downloadLink+'&confirm='+response.cookies[downloadWarning], headers=REQUEST_HEADER, cookies=response.cookies, stream=True)
         response.raise_for_status()
 
-        # Save response to file
         filename = __getFilenameFromContentDisposition(response.headers.get('Content-Disposition'))
-        path = DOWNLOAD_PATH_TEMP + '/' + filename if isArchive else DOWNLOAD_PATH + '/' + songToDownload['name'] + '/' + filename
+        downloadPath = os.path.join(downloadPath, filename)
 
-        with open(path, 'wb') as filehandle:
-            for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+        # Save response to file
+        with open(downloadPath, 'wb') as filehandle:
+            for chunk in response.iter_content(chunk_size=chunkSize):
                 filehandle.write(chunk)
-               
+             
         del response
         return filename
-
 
 def __getFilenameFromContentDisposition(cd: str):
     if not cd: return None
     _, data = parse_header(cd)
     return data['filename'] if 'filename' in data else None
 
-def __extractArchive(file: str):
-    patoolib.extract_archive(DOWNLOAD_PATH_TEMP + '/' + file, verbosity=-1, outdir=DOWNLOAD_PATH + '/', interactive=False)
-    os.remove(DOWNLOAD_PATH_TEMP + '/' + file)
+def __extractArchive(filename: str, tempFolder: str, download_folder: str):
+    patoolib.extract_archive(os.path.join(tempFolder, filename), verbosity=-1, outdir=download_folder + '/', interactive=False)
+    os.remove(os.path.join(tempFolder, filename))
 
-def __addDownloadedSongToList(id: int):
-    DOWNLOADED_SONGS_LIST.append(id)
-    with open(DOWNLOADED_SONGS_FILE, 'w') as filehandle:
-        filehandle.writelines([str(songId) + "\n" for songId in DOWNLOADED_SONGS_LIST])
+def __addDownloadedSongToList(id: int, songList: list, songListFile: str):
+    songList.append(id)
+    with open(songListFile, 'w') as filehandle:
+        filehandle.writelines([str(songId) + "\n" for songId in songList])
 
 bot.run(TOKEN)
