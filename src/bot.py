@@ -8,7 +8,6 @@ from asyncio import TimeoutError
 from cgi import parse_header
 from discord.ext import commands
 from dotenv import load_dotenv
-from logging import getLogger, FileHandler, Formatter, DEBUG
 
 # Globals
 load_dotenv()
@@ -19,15 +18,8 @@ DOWNLOADED_SONGS_FILE = './downloaded_songs.txt'
 DOWNLOAD_PATH = os.getenv('CHORUS_DOWNLOAD_PATH') or './download'
 DOWNLOAD_PATH_TEMP = './temp'
 EMBED_COLOUR = discord.Colour.blue()
-EXPIRE_AFTER_SECONDS = os.getenv('CHORUS_CACHE_EXPIRE_AFTER_SECONDS') or 60 * 10
+EXPIRE_AFTER_SECONDS = os.getenv('CHORUS_CACHE_EXPIRE_AFTER_SECONDS') or 60 * 60 * 24
 REQUEST_HEADER = {'User-Agent': 'Mozilla/5.0'}
-
-# Setting up the logger
-logger = getLogger('discord')
-logger.setLevel(DEBUG)
-handler = FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-handler.setFormatter(Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(handler)
 
 # loading Discord Token from environment variables
 TOKEN = os.getenv('DISCORD_TOKEN')
