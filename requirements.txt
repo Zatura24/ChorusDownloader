@@ -2,3 +2,4 @@ discord.py==1.4.0
 python-dotenv==0.14.0
 patool==1.12
 requests==2.20.0
+requests-cache==0.5.2

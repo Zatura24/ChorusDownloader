@@ -18,7 +18,8 @@ The following environment variables can be set during the docker run command:
     * DISCORD_TOKEN
 * Optional
     * DISCORD_COMMAND_PREFIX
-    * DOWNLOAD_PATH
     * CHORUS_API
+    * CHORUS_DOWNLOAD_PATH
+    * CHORUS_CACHE_EXPIRE_AFTER_SECONDS
 
 To add these to the docker run command use `--env KEY=VALUE`
