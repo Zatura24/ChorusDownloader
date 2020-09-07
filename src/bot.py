@@ -103,7 +103,7 @@ async def on_command_error(ctx, error):
     await ctx.send("Oops! It looks like my human isn't a good programmer afterall... 🦄")
 
 def getApiData(apiUrl: str, search_string: str, query_type: str = None):
-    url=apiUrl + ('search?query={0}%3D{1}'.format(query_type, search_string) if query_type else 'search?query={0}'.format(search_string))
+    url=apiUrl + ('search?query={0}%3D"{1}"'.format(query_type, search_string) if query_type else 'search?query={0}'.format(search_string))
     return requests.get(url, headers=REQUEST_HEADER).json()
 
 def generateResultChoices(apiData: dict):
