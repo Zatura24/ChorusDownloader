@@ -3,10 +3,13 @@ import patoolib
 import os
 import requests
 import requests_cache
+import logging
 from asyncio import TimeoutError
 from cgi import parse_header
 from discord.ext import commands
 from dotenv import load_dotenv
+
+logging.basicConfig(level=logging.INFO)
 
 # Globals
 load_dotenv()
@@ -99,7 +102,7 @@ async def search(ctx, search_string: str, query_type: str = None):
 
 @bot.event
 async def on_command_error(ctx, error):
-    print(error)
+    logging.error(error)
     await ctx.send("Oops! It looks like my human isn't a good programmer afterall... 🦄")
 
 def getApiData(apiUrl: str, search_string: str, query_type: str = None):
