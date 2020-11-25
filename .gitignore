@@ -3,5 +3,4 @@
 **/.vscode
 **/temp
 **/download
-**/chorus_cache.sqlite
 **/downloaded_songs.txt
