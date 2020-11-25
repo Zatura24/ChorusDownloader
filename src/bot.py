@@ -4,6 +4,7 @@ import patoolib
 import os
 import requests
 import logging
+import tempfile
 from asyncio import TimeoutError
 from cgi import parse_header
 from configparser import ConfigParser
@@ -22,8 +23,6 @@ API_URL = config['BOT']['apiUrl']
 bot = discord.ext.commands.Bot(
     command_prefix=config['BOT']['discordCommandPrefix'])
 
-if not os.path.exists(config['BOT']['downloadPathTemp']):
-    os.makedirs(config['BOT']['downloadPathTemp'])
 if not os.path.exists(config['BOT']['downloadPath']):
     os.makedirs(config['BOT']['downloadPath'])
 if not os.path.isfile(config['BOT']['downloadedSongsCacheFile']):
@@ -123,12 +122,11 @@ def download_song(songToDownload: dict):
 
     if 'directLinks' in songToDownload:
         if 'archive' in songToDownload['directLinks']:
-            extrach_archive(
-                download_song_to_path(
-                    songToDownload['directLinks']['archive'], config['BOT']['downloadPathTemp']),
-                config['BOT']['downloadPathTemp'],
-                config['BOT']['downloadPath']
-            )
+            with tempfile.TemporaryDirectory() as temporaryDirectory:
+                downloadedFile = download_song_to_path(
+                    songToDownload['directLinks']['archive'], temporaryDirectory)
+                extrach_archive(downloadedFile, temporaryDirectory,
+                                config['BOT']['downloadPath'])
         else:
             fullDownloadPath = os.path.join(
                 config['BOT']['downloadPath'], songToDownload['name'])
@@ -175,7 +173,6 @@ def extrach_archive(filename: str, tempFolder: str, download_folder: str):
     tempFile = os.path.join(tempFolder, filename)
     patoolib.extract_archive(tempFile, verbosity=-1,
                              outdir=download_folder+'/', interactive=False)
-    os.remove(tempFile)
 
 
 def cache_downloaded_song(id: int, songList: list, songListFile: str):

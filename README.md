@@ -62,4 +62,3 @@ Located in the `config.ini` the following configurations are available:
 | discordCommandPrefix     | true     | $                                 |
 | downloadedSongsCacheFile | true     | ./downloaded_songs.txt            |
 | downloadPath             | true     | ./download                        |
-| downloadPathTemp         | true     | ./temp                            |
