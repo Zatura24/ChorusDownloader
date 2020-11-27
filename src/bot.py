@@ -1,24 +1,23 @@
-import discord
-import discord.ext.commands
-import patoolib
+"""Bot"""
 import os
-import requests
 import logging
 import tempfile
 from asyncio import TimeoutError
 from cgi import parse_header
 from configparser import ConfigParser
-from dotenv import load_dotenv
+import discord
+import discord.ext.commands
+import patoolib
+import requests
 
 logging.basicConfig(filename='discord.log', level=logging.INFO)
 
 config = ConfigParser()
 config.read('config.ini')
 
-downloaded_songs_list = []
-
 REQUEST_HEADER = {'User-Agent': 'Mozilla/5.0'}
 API_URL = config['BOT']['apiUrl']
+DOWNLOADED_SONGS_LIST = []
 
 bot = discord.ext.commands.Bot(
     command_prefix=config['BOT']['discordCommandPrefix'])
@@ -29,7 +28,7 @@ if not os.path.isfile(config['BOT']['downloadedSongsCacheFile']):
     os.mknod(config['BOT']['downloadedSongsCacheFile'])
 else:
     with open(config['BOT']['downloadedSongsCacheFile'], 'r') as filehandle:
-        downloaded_songs_list = [int(line.rstrip('\n')) for line in filehandle]
+        DOWNLOADED_SONGS_LIST = [int(line.rstrip('\n')) for line in filehandle]
 
 
 @bot.event
@@ -67,37 +66,38 @@ async def search_and_download(ctx: discord.ext.commands.Context, search_string: 
         return await ctx.send('```First, add an api url with: {0}api <url>```'.format(config['DISCORD']['discordCommandPrefix']))
 
     # Make the search request and present the user with the response
-    apiData = get_api_data_json(API_URL, search_string, query_type)
-    apiResultChoice = generate_choise_result(apiData)
-    apiResponse = discord.Embed(
+    api_data = get_api_data_json(API_URL, search_string, query_type)
+    api_result_choice = generate_choise_result(api_data)
+    api_response = discord.Embed(
         title=ctx.message.author.name,
         colour=discord.Colour.blue(),
-        description='\n'.join(apiResultChoice)
+        description='\n'.join(api_result_choice)
     )
-    apiResponse.set_footer(text='Type a number to download it')
-    choisesMessage = await ctx.send(embed=apiResponse, delete_after=config['BOT'].getfloat('defaultTimeout'))
+    api_response.set_footer(text='Type a number to download it')
+    choises_message = await ctx.send(embed=api_response, delete_after=config['BOT'].getfloat('defaultTimeout'))
 
     # Handeling the user response
     def is_valid_respone(message):
-        return ctx.message.author.name == message.author.name and message.content.isdigit() and 0 < int(message.content) <= len(apiData['songs'])
+        return ctx.message.author.name == message.author.name and message.content.isdigit() and 0 < int(message.content) <= len(api_data['songs'])
 
     try:
-        responseMessage = await bot.wait_for('message', check=is_valid_respone, timeout=config['BOT'].getfloat('defaultTimeout'))
-        songToDownload = apiData['songs'][int(responseMessage.content) - 1]
+        response_messasge = await bot.wait_for('message', check=is_valid_respone, timeout=config['BOT'].getfloat('defaultTimeout'))
+        song_to_download = api_data['songs'][int(
+            response_messasge.content) - 1]
+        await choises_message.delete()
 
-        async def send_download_message(songToDownload: dict, message: str):
-            return await ctx.send(message + '{0} - {1}'.format(songToDownload['name'], songToDownload['artist']))
+        async def send_download_message(song_to_download: dict, message: str):
+            return await ctx.send(message + '{0} - {1}'.format(song_to_download['name'], song_to_download['artist']))
 
-        if songToDownload['id'] in downloaded_songs_list:
-            return await send_download_message(songToDownload, '✅ Already downloaded: ')
+        if song_to_download['id'] in DOWNLOADED_SONGS_LIST:
+            return await send_download_message(song_to_download, '✅ Already downloaded: ')
+
+        downloading_message = await send_download_message(song_to_download, '⌛ Downloading: ')
+        if download_song(song_to_download):
+            await send_download_message(song_to_download, '✅ Downloaded: ')
         else:
-            await choisesMessage.delete()
-            downloadingMessage = await send_download_message(songToDownload, '⌛ Downloading: ')
-            if download_song(songToDownload):
-                await send_download_message(songToDownload, '✅ Downloaded: ')
-            else:
-                await send_download_message(songToDownload, '❌ Error downloading: ')
-            await downloadingMessage.delete()
+            await send_download_message(song_to_download, '❌ Error downloading: ')
+        await downloading_message.delete()
     except TimeoutError:
         pass  # ignoring because the user did not respond. Nothing went wrong
 
@@ -109,7 +109,9 @@ def get_api_data_json(apiUrl: str, search_string: str, query_type: str = None):
 
 
 def generate_choise_result(apiData: dict):
-    def tierGuitar(song): return ' | '+('⭐' * int(song['tier_guitar']))
+    def tierGuitar(song):
+        return ' | '+('⭐' * int(song['tier_guitar']))
+
     return [
         '`{0}` {1} - {2}{3}'.format(i, song['name'],
                                     song['artist'], tierGuitar(song) if song['tier_guitar'] else '')
@@ -117,26 +119,26 @@ def generate_choise_result(apiData: dict):
     ]
 
 
-def download_song(songToDownload: dict):
-    global downloaded_songs_list
+def download_song(song_to_download: dict):
+    global DOWNLOADED_SONGS_LIST
 
-    if 'directLinks' in songToDownload:
-        if 'archive' in songToDownload['directLinks']:
-            with tempfile.TemporaryDirectory() as temporaryDirectory:
-                downloadedFile = download_song_to_path(
-                    songToDownload['directLinks']['archive'], temporaryDirectory)
-                extrach_archive(downloadedFile, temporaryDirectory,
+    if 'directLinks' in song_to_download:
+        if 'archive' in song_to_download['directLinks']:
+            with tempfile.TemporaryDirectory() as temporary_directory:
+                downloaded_file = download_song_to_path(
+                    song_to_download['directLinks']['archive'], temporary_directory)
+                extrach_archive(downloaded_file, temporary_directory,
                                 config['BOT']['downloadPath'])
         else:
-            fullDownloadPath = os.path.join(
-                config['BOT']['downloadPath'], songToDownload['name'])
-            os.makedirs(fullDownloadPath)
-            for directLink in songToDownload['directLinks']:
+            full_download_path = os.path.join(
+                config['BOT']['downloadPath'], song_to_download['name'])
+            os.makedirs(full_download_path)
+            for direct_link in song_to_download['directLinks']:
                 download_song_to_path(
-                    songToDownload['directLinks'][directLink], fullDownloadPath)
+                    song_to_download['directLinks'][direct_link], full_download_path)
 
-        downloaded_songs_list = cache_downloaded_song(songToDownload['id'],
-                                                      downloaded_songs_list,
+        DOWNLOADED_SONGS_LIST = cache_downloaded_song(song_to_download['id'],
+                                                      DOWNLOADED_SONGS_LIST,
                                                       config['BOT']['downloadedSongsCacheFile'])
         return True
     return False
@@ -145,9 +147,9 @@ def download_song(songToDownload: dict):
 def download_song_to_path(downloadLink: str, downloadPath: str):
     with requests.get(downloadLink, headers=REQUEST_HEADER, stream=True) as response:
         # Bypass Google drive virus scanning warning
-        downloadWarning = check_for_download_warning(response)
-        if downloadWarning:
-            response = requests.get(downloadLink+'&confirm='+response.cookies[downloadWarning],
+        download_warning = check_for_download_warning(response)
+        if download_warning:
+            response = requests.get(downloadLink+'&confirm='+response.cookies[download_warning],
                                     headers=REQUEST_HEADER,
                                     cookies=response.cookies,
                                     stream=True)
@@ -170,8 +172,8 @@ def get_filename_from_content_disposition(cd: str):
 
 
 def extrach_archive(filename: str, tempFolder: str, download_folder: str):
-    tempFile = os.path.join(tempFolder, filename)
-    patoolib.extract_archive(tempFile, verbosity=-1,
+    temp_file = os.path.join(tempFolder, filename)
+    patoolib.extract_archive(temp_file, verbosity=-1,
                              outdir=download_folder+'/', interactive=False)
 
 

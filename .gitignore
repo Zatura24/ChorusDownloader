@@ -3,6 +3,7 @@
 **/.vscode
 **/Pipfile
 **/Pipfile.lock
+**/.pylintrc
 **/temp
 **/download
 **/downloaded_songs.txt
