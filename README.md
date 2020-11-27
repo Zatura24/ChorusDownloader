@@ -1,8 +1,7 @@
 # 🎶 Chorus Downloader 🎶
-Chorus Downloader is a discord bot for downloading songs of Chorus like repositories.
+Chorus Downloader is a discord bot for downloading songs of Chorus like repositories to local/remote filestorages.
 
-This bot is based on the API created by Paturages: [Chorus](https://github.com/Paturages/chorus)
-
+This bot is based on the API created by Paturages: [Chorus](https://github.com/Paturages/chorus). 
 
 # Avaiable commands
 Following is a list of available commands.
@@ -30,7 +29,7 @@ Currently the following `query_type`s are available:
 - hasForced
 
 # Install
-Make sure to first create a discord bot, and have it's token ready. A tutorial can be found here: [Creating a bot account](https://discordpy.readthedocs.io/en/latest/discord.html). Also make sure to create an Admin role inside your discord server, because this necessary for setting the url.
+Make sure docker is running in your machine, or remote server, and you have created a discord bot. A tutorial to create your discord bot can be found here: [Creating a bot account](https://discordpy.readthedocs.io/en/latest/discord.html). Also make sure to create an Admin role inside your discord server, because this necessary for setting the url.
 
 First create a docker image:
 ```bash
@@ -54,11 +53,11 @@ To add these to the docker run command use `--env KEY=VALUE`
 
 ## Config file settings
 Located in the `config.ini` the following configurations are available:
-| variable                 | required | default                           |
-| ------------------------ | -------- | --------------------------------- |
-| apiUrl                   | false    | "https://chorus.fightthe.pw/api/" |
-| chunkSize                | true     | 8192                              |
-| defaultTimeout           | true     | 15.0                              |
-| discordCommandPrefix     | true     | $                                 |
-| downloadedSongsCacheFile | true     | ./downloaded_songs.txt            |
-| downloadPath             | true     | ./download                        |
+| variable                 | required | default                         |
+| ------------------------ | -------- | ------------------------------- |
+| apiUrl                   | false    | https://chorus.fightthe.pw/api/ |
+| chunkSize                | true     | 8192                            |
+| defaultTimeout           | true     | 15.0                            |
+| discordCommandPrefix     | true     | $                               |
+| downloadedSongsCacheFile | true     | ./downloaded_songs.txt          |
+| downloadPath             | true     | ./download                      |

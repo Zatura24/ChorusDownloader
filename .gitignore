@@ -1,6 +1,8 @@
 **/.env
 **/*.log
 **/.vscode
+**/Pipfile
+**/Pipfile.lock
 **/temp
 **/download
 **/downloaded_songs.txt
